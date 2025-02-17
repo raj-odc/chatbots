@@ -1,19 +1,19 @@
 import streamlit as st
-import openai
+from openai import OpenAI  # Updated OpenAI import
 import anthropic
 import google.generativeai as genai
 import requests
+import time
 
 # Set up API keys
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-anthropic.api_key = st.secrets["ANTHROPIC_API_KEY"]
+openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+claude = anthropic.Client(api_key=st.secrets["ANTHROPIC_API_KEY"])
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 
 # Initialize models
 gemini_model = genai.GenerativeModel('gemini-pro')
-claude_model = anthropic.Client()
-openai_model = "gpt-4"  # or "gpt-3.5-turbo"
+openai_model = "gpt-3.5-turbo"
 
 # Streamlit app
 st.title("Multi-Chatbot Comparison App")
@@ -26,30 +26,36 @@ if user_input:
     st.write(f"**Your Query:** {user_input}")
     st.write("**Results:**")
 
-    # Function to call OpenAI
+    # Function to call OpenAI (updated for OpenAI API v1.0.0)
     def call_openai(query):
-        response = openai.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model=openai_model,
             messages=[{"role": "user", "content": query}]
         )
-        return response['choices'][0]['message']['content']
+        return response.choices[0].message.content
 
-    # Function to call Claude
+    # Function to call Claude (updated for latest Anthropic API)
     def call_claude(query):
-        response = claude_model.completion(
-            prompt=f"\n\nHuman: {query}\n\nAssistant:",
-            max_tokens_to_sample=1000
+        message = claude.messages.create(
+            model="claude-3-opus-20240229",
+            max_tokens=1000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ]
         )
-        return response['completion']
+        return message.content[0].text
 
     # Function to call Gemini
     def call_gemini(query):
         response = gemini_model.generate_content(query)
         return response.text
 
-    # Function to call DeepSeek API
+    # Function to call DeepSeek API (updated with correct endpoint)
     def call_deepseek(query):
-        url = "https://api.deepseek.ai/v1/chat/completions"  # Updated API endpoint
+        url = "https://api.deepseek.com/v1/chat/completions"  # Corrected endpoint
         headers = {
             "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
             "Content-Type": "application/json"
@@ -67,69 +73,79 @@ if user_input:
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
             return response.json()['choices'][0]['message']['content']
         except requests.exceptions.RequestException as e:
             return f"Error calling DeepSeek API: {str(e)}"
 
-    # Get responses from all models with error handling
+    # Get responses from all models with error handling and timing
     responses = {}
+    response_times = {}
     
     with st.spinner('Getting responses from all models...'):
         # OpenAI
         try:
+            start_time = time.time()
             responses['OpenAI'] = call_openai(user_input)
+            response_times['OpenAI'] = time.time() - start_time
         except Exception as e:
             responses['OpenAI'] = f"Error with OpenAI: {str(e)}"
+            response_times['OpenAI'] = 0
         
         # Claude
         try:
+            start_time = time.time()
             responses['Claude'] = call_claude(user_input)
+            response_times['Claude'] = time.time() - start_time
         except Exception as e:
             responses['Claude'] = f"Error with Claude: {str(e)}"
+            response_times['Claude'] = 0
         
         # Gemini
         try:
+            start_time = time.time()
             responses['Gemini'] = call_gemini(user_input)
+            response_times['Gemini'] = time.time() - start_time
         except Exception as e:
             responses['Gemini'] = f"Error with Gemini: {str(e)}"
+            response_times['Gemini'] = 0
         
         # DeepSeek
         try:
+            start_time = time.time()
             responses['DeepSeek'] = call_deepseek(user_input)
+            response_times['DeepSeek'] = time.time() - start_time
         except Exception as e:
             responses['DeepSeek'] = f"Error with DeepSeek: {str(e)}"
+            response_times['DeepSeek'] = 0
 
     # Display results in columns
     col1, col2 = st.columns(2)
     with col1:
         st.write("**OpenAI (GPT-4):**")
         st.write(responses['OpenAI'])
+        st.write(f"Response time: {response_times['OpenAI']:.2f}s")
     with col2:
         st.write("**Claude (Anthropic):**")
         st.write(responses['Claude'])
+        st.write(f"Response time: {response_times['Claude']:.2f}s")
 
     col3, col4 = st.columns(2)
     with col3:
         st.write("**Google Gemini:**")
         st.write(responses['Gemini'])
+        st.write(f"Response time: {response_times['Gemini']:.2f}s")
     with col4:
         st.write("**DeepSeek:**")
         st.write(responses['DeepSeek'])
+        st.write(f"Response time: {response_times['DeepSeek']:.2f}s")
 
     # Add a comparison table
-    st.write("**Comparison Table:**")
+    st.write("**Comparison Metrics:**")
     comparison_data = {
         "Model": list(responses.keys()),
-        "Response": list(responses.values())
+        "Response Length": [len(str(response)) for response in responses.values()],
+        "Response Time (s)": [f"{time:.2f}" for time in response_times.values()]
     }
     st.table(comparison_data)
-
-    # Add response lengths comparison
-    st.write("**Response Lengths (characters):**")
-    lengths_data = {
-        "Model": list(responses.keys()),
-        "Length": [len(str(response)) for response in responses.values()]
-    }
-    st.table(lengths_data)
