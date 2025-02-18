@@ -120,26 +120,37 @@ if user_input:
             responses['DeepSeek'] = f"Error with DeepSeek: {str(e)}"
             response_times['DeepSeek'] = 0
 
-    # Display results in columns
-    col1, col2 = st.columns(2)
+    # Display results in a single row with borders
+    st.subheader("Comparison of Responses")
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])  # Each column takes up a width of 2
+
     with col1:
+        st.markdown("<div style='border: 1px solid black; padding: 10px;'>", unsafe_allow_html=True)
         st.write("**OpenAI (GPT-4):**")
         st.write(responses['OpenAI'])
         st.write(f"Response time: {response_times['OpenAI']:.2f}s")
+        st.markdown("</div>", unsafe_allow_html=True)
+
     with col2:
+        st.markdown("<div style='border: 1px solid black; padding: 10px;'>", unsafe_allow_html=True)
         st.write("**Claude (Anthropic):**")
         st.write(responses['Claude'])
         st.write(f"Response time: {response_times['Claude']:.2f}s")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    col3, col4 = st.columns(2)
     with col3:
+        st.markdown("<div style='border: 1px solid black; padding: 10px;'>", unsafe_allow_html=True)
         st.write("**Google Gemini:**")
         st.write(responses['Gemini'])
         st.write(f"Response time: {response_times['Gemini']:.2f}s")
+        st.markdown("</div>", unsafe_allow_html=True)
+
     with col4:
+        st.markdown("<div style='border: 1px solid black; padding: 10px;'>", unsafe_allow_html=True)
         st.write("**DeepSeek:**")
         st.write(responses['DeepSeek'])
         st.write(f"Response time: {response_times['DeepSeek']:.2f}s")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Add a comparison table
     st.write("**Comparison Metrics:**")
